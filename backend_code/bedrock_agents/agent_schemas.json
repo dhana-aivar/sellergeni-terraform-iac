@@ -1,0 +1,28 @@
+{
+  "agents": [
+    {
+      "name": "product_title_agent",
+      "description": "Agent for generating product titles",
+      "foundation_model": "anthropic.claude-v2",
+      "instructions": "Generate compelling product titles based on product attributes",
+      "action_groups": []
+    },
+    {
+      "name": "product_description_agent",
+      "description": "Agent for generating product descriptions",
+      "foundation_model": "anthropic.claude-v2",
+      "instructions": "Generate detailed product descriptions based on product attributes",
+      "action_groups": []
+    }
+  ],
+  "knowledge_bases": [
+    {
+      "name": "product_knowledge_base",
+      "description": "Knowledge base containing product information and best practices",
+      "data_source": {
+        "type": "S3",
+        "bucket": "sellergeni-product-data"
+      }
+    }
+  ]
+}

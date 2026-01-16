@@ -1,0 +1,80 @@
+name: SellerGeni Infrastructure Deployment
+
+on:
+  push:
+    branches: [main, develop]
+    paths: ['terraform/**', 'backend_code/**']
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment Environment'
+        type: choice
+        options: [dev, prod]
+        default: dev
+
+env:
+  AWS_REGION: us-east-1
+  TF_VERSION: 1.6.0
+  STATE_BUCKET: sellergeni-terraform-state-bucket
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  validate:
+    name: Validate & Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+      - name: Terraform Format
+        run: terraform fmt -check -recursive
+      - name: Security Scan (tfsec)
+        uses: aquasecurity/tfsec-action@v1.0.0
+
+  deploy-phase1-core:
+    name: Phase 1 (VPC/Security)
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::123456789012:role/GitHubActionsRole
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Deploy Core Network
+        run: |
+          cd terraform
+          terraform init -backend-config="bucket=${{ env.STATE_BUCKET }}"
+          terraform apply -target=module.vpc -target=module.kms -auto-approve
+
+  deploy-phase2-compute:
+    name: Phase 2 (Bedrock & Lambda)
+    needs: deploy-phase1-core
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Zip Lambda Artifacts
+        run: |
+          cd backend_code/title_generator && zip -r ../../title_gen.zip .
+          cd ../description_generator && zip -r ../../desc_gen.zip .
+      - name: Deploy Compute Layer
+        run: |
+          cd terraform
+          terraform init
+          terraform apply -target=module.s3 -target=module.bedrock -target=module.lambda -auto-approve
+
+  deploy-phase3-api:
+    name: Phase 3 (API Gateway)
+    needs: deploy-phase2-compute
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy API Gateway
+        run: |
+          cd terraform
+          terraform init
+          terraform apply -target=module.apigateway -auto-approve

@@ -1,0 +1,51 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation template to create S3 bucket and DynamoDB table for SellerGeni Terraform state'
+
+Parameters:
+  Region:
+    Type: String
+    Default: us-east-1
+    Description: Region where state resources will be created
+
+Resources:
+  TerraformStateBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: 'sellergeni-terraform-state-bucket'
+      VersioningConfiguration:
+        Status: 'Enabled'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'AES256'
+      Tags:
+        - Key: Project
+          Value: SellerGeni-Migration
+
+  TerraformLockTable:
+    Type: 'AWS::DynamoDB::Table'
+    Properties:
+      TableName: 'terraform-state-locks'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: LockID
+          AttributeType: S
+      KeySchema:
+        - AttributeName: LockID
+          KeyType: HASH
+      Tags:
+        - Key: Purpose
+          Value: TerraformStateLocking
+
+Outputs:
+  BucketName:
+    Value: !Ref TerraformStateBucket
+    Description: The S3 bucket for Terraform state
+  TableName:
+    Value: !Ref TerraformLockTable
+    Description: The DynamoDB table for state locking
