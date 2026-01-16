@@ -49,3 +49,4 @@ Outputs:
   TableName:
     Value: !Ref TerraformLockTable
     Description: The DynamoDB table for state locking
+    
